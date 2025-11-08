@@ -1,6 +1,7 @@
 name: Update SP500 Dashboard
 
 on:
+  push:  # Temporary to trigger the first run
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
