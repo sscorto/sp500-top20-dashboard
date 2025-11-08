@@ -175,7 +175,12 @@ def update_sheet():
 
     # === FOOTER NOTES ===
     footer_start = last_row + 2
-    notes = ['Auto-updated from GitHub Actions', 'Every 15 min during trading hours', 'No Mac needed', 'Consensus Fwd PE sourced from Yahoo Finance']
+    notes = [
+        'Auto-updated from GitHub Actions',
+        'Every 15 min during trading hours (EST)',
+        'No Mac needed',
+        'Consensus Fwd PE sourced from Yahoo Finance'
+    ]
     for i, line in enumerate(notes, start=footer_start):
         ws.update_cell(i, 1, line)
 
