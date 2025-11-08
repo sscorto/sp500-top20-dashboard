@@ -75,6 +75,7 @@ CONSENSUS_FWD_PE = {
         'Goldman Sachs': 85.8,
         'GuruFocus': 84.9
     }
+    # You can add more multi-source consensus here if desired
 }
 
 TOP_20_TICKERS = [
@@ -100,22 +101,25 @@ def fmt_mcap(m):
     if m >= 1e9: return f"${m/1e9:.2f}B"
     return f"${m/1e6:.2f}M"
 
-def compute_consensus_avg(ticker):
+def compute_consensus_avg(ticker, yahoo_fwd=None):
     sources = CONSENSUS_FWD_PE.get(ticker)
-    if not sources:
+    if sources:
+        values = list(sources.values())
+        avg = sum(values) / len(values)
+        source_list = ', '.join(sources.keys())
+        return avg, source_list
+    elif yahoo_fwd:
+        return yahoo_fwd, "Yahoo"
+    else:
         return None, None
-    values = list(sources.values())
-    avg = sum(values) / len(values)
-    source_list = ', '.join(sources.keys())
-    return avg, source_list
 
 def update_sheet(test_mode=False):
     est = pytz.timezone("US/Eastern")
     now_est = datetime.now(est)
 
     if not test_mode:
-        # Normal trading hours check
-        if now_est.weekday() >= 5 or now_est.hour < 9 or (now_est.hour == 9 and now_est.minute < 30) or now_est.hour > 16:
+        # Only update during trading hours: Mon-Fri 9:30–16:00 EST
+        if now_est.weekday() >= 5 or now_est.hour < 9 or (now_est.hour == 9 and now_est.minute < 30) or now_est.hour >= 16:
             print("Market closed: skipping update.")
             return
     else:
@@ -172,8 +176,8 @@ def update_sheet(test_mode=False):
             price = info.get('currentPrice') or (hist['Close'][-1] if not hist.empty else 0)
             mcap = info.get('marketCap', 0)
             trail_pe = info.get('trailingPE')
-            cons_avg, cons_sources = compute_consensus_avg(ticker)
             yahoo_fwd = info.get('forwardPE')
+            cons_avg, cons_sources = compute_consensus_avg(ticker, yahoo_fwd)
 
             row = [
                 ticker,
@@ -234,7 +238,7 @@ def update_sheet(test_mode=False):
         'Auto-updated from GitHub Actions',
         'Every 15 min during trading hours (EST)',
         'No Mac needed',
-        'Consensus Fwd PE averaged from multiple sources: Seeking Alpha, MarketWatch, JP Morgan, Goldman Sachs, GuruFocus'
+        'Consensus Fwd PE averaged from multiple sources if available, else Yahoo Finance'
     ]
     for i, line in enumerate(notes, start=footer_start):
         ws.update_cell(i, 1, line)
