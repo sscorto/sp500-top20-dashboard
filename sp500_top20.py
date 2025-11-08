@@ -27,7 +27,6 @@ else:
 client = gspread.authorize(creds)
 
 # === CONSENSUS DATA WITH SOURCE ===
-# Source: Yahoo Finance / Analysts consensus as of Nov 2025
 CONSENSUS_FWD_PE = {
     'AMZN': (32.3, "Yahoo Finance"),
     'GOOGL': (26.2, "Yahoo Finance"),
@@ -38,14 +37,12 @@ CONSENSUS_FWD_PE = {
     'AAPL': (33.5, "Yahoo Finance"),
 }
 
-# Top 20 tickers
 TOP_20_TICKERS = [
     'NVDA', 'MSFT', 'AAPL', 'AVGO', 'GOOGL', 'AMZN', 'META',
     'TSLA', 'GOOG', 'BRK-B', 'LLY', 'JPM', 'UNH', 'XOM',
     'V', 'PG', 'MA', 'JNJ', 'HD', 'ORCL'
 ]
 
-# Fixed assets
 FIXED_ASSETS = [
     ('^GSPC',   'S&P 500 Index'),
     ('^IXIC',   'Nasdaq 100'),
@@ -63,22 +60,22 @@ def fmt_mcap(m):
     if m >= 1e9: return f"${m/1e9:.2f}B"
     return f"${m/1e6:.2f}M"
 
-def update_sheet():
-    # === TRADING HOURS CHECK ===
+def update_sheet(test_mode=False):
     est = pytz.timezone("US/Eastern")
     now_est = datetime.now(est)
-    if now_est.weekday() >= 5:  # Sat/Sun
-        print("Market closed: weekend. Skipping update.")
-        sys.exit()
-    if not (now_est.hour > 9 or (now_est.hour == 9 and now_est.minute >= 30)) or now_est.hour > 16:
-        print("Market closed: outside trading hours. Skipping update.")
-        sys.exit()
+
+    if not test_mode:
+        # Normal market hours check
+        if now_est.weekday() >= 5 or now_est.hour < 9 or (now_est.hour == 9 and now_est.minute < 30) or now_est.hour > 16:
+            print("Market closed: skipping update.")
+            sys.exit()
+    else:
+        print(f"TEST MODE: Running update at {now_est.strftime('%Y-%m-%d %I:%M %p EST')}")
 
     spreadsheet = client.open_by_key(SHEET_ID)
     ws = spreadsheet.sheet1
     ws.clear()
 
-    # === HEADERS ===
     headers = ['Stock', 'Trailing PE', 'Consensus Fwd PE', 'Forward PE (Yahoo)', 'Current Price', 'Market Cap',
                'Daily %', '5D %', '2W %', '1M %', '3M %', '6M %', '12M %', '52W Low', '52W High']
     ws.append_row(headers)
@@ -87,93 +84,51 @@ def update_sheet():
 
     all_rows = []
 
-    # === FIXED ASSETS DATA ===
+    # Fixed assets
     for ticker, name in FIXED_ASSETS:
         try:
             stock = yf.Ticker(ticker)
             info = stock.info
-            hist = stock.history(period='2y')
-            price = info.get('regularMarketPrice') or info.get('currentPrice') or (hist['Close'][-1] if not hist.empty else None)
-            if not price: continue
+            price = info.get('regularMarketPrice') or info.get('currentPrice') or 0
             row = [name, 'N/A', 'N/A', 'N/A', f"${price:.2f}", 'N/A']
-            daily = info.get('regularMarketChangePercent')
-            row.append(f"{daily:.2f}%" if daily else 'N/A')
-            today = now_est.date()
-            hist = hist.sort_index()
-            for days in PERIODS_DAYS:
-                past = today - timedelta(days=days)
-                past_slice = hist[hist.index.date <= past]
-                if not past_slice.empty:
-                    past_price = past_slice['Close'][-1]
-                    pct = (price - past_price) / past_price * 100
-                    row.append(f"{pct:.2f}%")
-                else:
-                    row.append('N/A')
-            low = info.get('fiftyTwoWeekLow')
-            high = info.get('fiftyTwoWeekHigh')
-            row.append(f"${low:.2f}" if low else 'N/A')
-            row.append(f"${high:.2f}" if high else 'N/A')
             all_rows.append((float('inf'), row))
-        except Exception as e:
-            print(f"Error {name}: {e}")
+        except:
+            continue
 
-    # === TOP 20 STOCKS DATA ===
-    stock_data = []
+    # Top 20 tickers
     for ticker in TOP_20_TICKERS:
         try:
             stock = yf.Ticker(ticker)
             info = stock.info
-            hist = stock.history(period='2y')
-            price = info.get('currentPrice') or (hist['Close'][-1] if not hist.empty else None)
+            price = info.get('currentPrice') or 0
             mcap = info.get('marketCap', 0)
-            if not price: continue
-            row = [ticker]
             trail_pe = info.get('trailingPE')
-            row.append(f"{trail_pe:.1f}" if trail_pe else 'N/A')
             cons_val, cons_source = CONSENSUS_FWD_PE.get(ticker, (info.get('forwardPE'), "Yahoo Finance"))
-            row.append(f"{cons_val:.1f} ({cons_source})" if cons_val else 'N/A')
             yahoo_fwd = info.get('forwardPE')
-            row.append(f"{yahoo_fwd:.1f}" if yahoo_fwd else 'N/A')
-            row.append(f"${price:.2f}")
-            row.append(fmt_mcap(mcap))
-            daily = info.get('regularMarketChangePercent')
-            row.append(f"{daily:.2f}%" if daily else 'N/A')
-            for days in PERIODS_DAYS:
-                past = now_est.date() - timedelta(days=days)
-                past_slice = hist[hist.index.date <= past]
-                if not past_slice.empty:
-                    past_price = past_slice['Close'][-1]
-                    pct = (price - past_price) / past_price * 100
-                    row.append(f"{pct:.2f}%")
-                else:
-                    row.append('N/A')
-            row += [f"${info.get('fiftyTwoWeekLow', 'N/A'):.2f}", f"${info.get('fiftyTwoWeekHigh', 'N/A'):.2f}"]
-            stock_data.append((mcap or 0, row))
-        except Exception as e:
-            print(f"Error {ticker}: {e}")
+            row = [
+                ticker,
+                f"{trail_pe:.1f}" if trail_pe else 'N/A',
+                f"{cons_val:.1f} ({cons_source})" if cons_val else 'N/A',
+                f"{yahoo_fwd:.1f}" if yahoo_fwd else 'N/A',
+                f"${price:.2f}",
+                fmt_mcap(mcap)
+            ]
+            all_rows.append((mcap or 0, row))
+        except:
+            continue
 
-    # Sort by market cap descending
-    stock_data.sort(key=lambda x: x[0], reverse=True)
-    all_rows.extend(stock_data)
+    all_rows.sort(key=lambda x: x[0], reverse=True)
     sorted_rows = [row for mcap, row in all_rows]
-
     if sorted_rows:
         ws.append_rows(sorted_rows)
-        for i in range(len(sorted_rows)):
-            row_num = i + 2
-            color = {'red': 0.95, 'green': 0.95, 'blue': 0.95} if row_num % 2 == 0 else {'red': 1, 'green': 1, 'blue': 1}
-            ws.format(f'A{row_num}:O{row_num}', {'backgroundColor': color})
 
-    ws.freeze(rows=1, cols=1)
-    ws.format("A2:A1000", {"textFormat": {"bold": False}})
-
-    # === LAST UPDATED ===
+    # Last updated EST
     ts = now_est.strftime("%Y-%m-%d %I:%M %p EST")
     last_row = len(sorted_rows) + 2
     ws.update_cell(last_row, 1, 'Last Updated:')
     ws.update_cell(last_row, 2, ts)
 
-    # === FOOTER NOTES ===
+    # Footer notes
     footer_start = last_row + 2
     notes = [
         'Auto-updated from GitHub Actions',
@@ -184,7 +139,7 @@ def update_sheet():
     for i, line in enumerate(notes, start=footer_start):
         ws.update_cell(i, 1, line)
 
-    print(f"\nDASHBOARD UPDATED: {spreadsheet.url}\n")
+    print(f"\nTEST DASHBOARD UPDATED: {spreadsheet.url}\n")
 
 if __name__ == "__main__":
-    update_sheet()
+    update_sheet(test_mode=True)
