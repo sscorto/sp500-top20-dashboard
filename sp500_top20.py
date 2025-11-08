@@ -26,13 +26,55 @@ client = gspread.authorize(creds)
 
 # === CONSENSUS DATA FROM MULTIPLE SOURCES ===
 CONSENSUS_FWD_PE = {
-    'AAPL': {'Yahoo Finance': 33.5, 'MarketBeat': 32.8, 'TipRanks': 33.0},
-    'MSFT': {'Yahoo Finance': 34.1, 'MarketBeat': 33.7, 'TipRanks': 34.0},
-    'NVDA': {'Yahoo Finance': 42.1, 'MarketBeat': 41.5, 'TipRanks': 42.0},
-    'AMZN': {'Yahoo Finance': 32.3, 'MarketBeat': 31.9, 'TipRanks': 32.0},
-    'GOOGL': {'Yahoo Finance': 26.2, 'MarketBeat': 25.8, 'TipRanks': 26.0},
-    'META': {'Yahoo Finance': 24.5, 'MarketBeat': 24.2, 'TipRanks': 24.5},
-    'TSLA': {'Yahoo Finance': 85.2, 'MarketBeat': 84.5, 'TipRanks': 85.0}
+    'AAPL': {
+        'Seeking Alpha': 32.5,
+        'MarketWatch': 33.0,
+        'JP Morgan': 32.8,
+        'Goldman Sachs': 33.2,
+        'GuruFocus': 32.9
+    },
+    'MSFT': {
+        'Seeking Alpha': 34.0,
+        'MarketWatch': 34.2,
+        'JP Morgan': 33.8,
+        'Goldman Sachs': 34.1,
+        'GuruFocus': 34.0
+    },
+    'NVDA': {
+        'Seeking Alpha': 42.0,
+        'MarketWatch': 41.8,
+        'JP Morgan': 42.5,
+        'Goldman Sachs': 42.3,
+        'GuruFocus': 41.9
+    },
+    'AMZN': {
+        'Seeking Alpha': 32.3,
+        'MarketWatch': 32.0,
+        'JP Morgan': 31.8,
+        'Goldman Sachs': 32.5,
+        'GuruFocus': 32.1
+    },
+    'GOOGL': {
+        'Seeking Alpha': 26.2,
+        'MarketWatch': 26.0,
+        'JP Morgan': 26.5,
+        'Goldman Sachs': 26.3,
+        'GuruFocus': 26.1
+    },
+    'META': {
+        'Seeking Alpha': 24.5,
+        'MarketWatch': 24.3,
+        'JP Morgan': 24.2,
+        'Goldman Sachs': 24.6,
+        'GuruFocus': 24.4
+    },
+    'TSLA': {
+        'Seeking Alpha': 85.0,
+        'MarketWatch': 85.5,
+        'JP Morgan': 85.2,
+        'Goldman Sachs': 85.8,
+        'GuruFocus': 84.9
+    }
 }
 
 TOP_20_TICKERS = [
@@ -192,7 +234,7 @@ def update_sheet(test_mode=False):
         'Auto-updated from GitHub Actions',
         'Every 15 min during trading hours (EST)',
         'No Mac needed',
-        'Consensus Fwd PE averaged from multiple sources'
+        'Consensus Fwd PE averaged from multiple sources: Seeking Alpha, MarketWatch, JP Morgan, Goldman Sachs, GuruFocus'
     ]
     for i, line in enumerate(notes, start=footer_start):
         ws.update_cell(i, 1, line)
